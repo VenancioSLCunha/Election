@@ -1,5 +1,6 @@
 package br.edu.ulbra.election.election.service;
 
+import br.edu.ulbra.election.election.client.CandidateClientService;
 import br.edu.ulbra.election.election.enums.StateCodes;
 import br.edu.ulbra.election.election.exception.GenericOutputException;
 import br.edu.ulbra.election.election.input.v1.ElectionInput;
@@ -7,11 +8,14 @@ import br.edu.ulbra.election.election.model.Election;
 import br.edu.ulbra.election.election.output.v1.ElectionOutput;
 import br.edu.ulbra.election.election.output.v1.GenericOutput;
 import br.edu.ulbra.election.election.repository.ElectionRepository;
+import br.edu.ulbra.election.election.repository.VoteRepository;
+import feign.FeignException;
 import org.apache.commons.lang.StringUtils;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.TypeToken;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
 
 import java.lang.reflect.Type;
 import java.util.List;
@@ -20,12 +24,16 @@ import java.util.List;
 public class ElectionService {
 
     private final ElectionRepository electionRepository;
+    private final VoteRepository voteRepository;
     private final ModelMapper modelMapper;
+    private final CandidateClientService candidateClientService;
     
     @Autowired
-    public ElectionService(ElectionRepository electionRepository, ModelMapper modelMapper){
+    public ElectionService(ElectionRepository electionRepository, VoteRepository voteRepository, ModelMapper modelMapper, CandidateClientService candidateClientService){
         this.electionRepository = electionRepository;
+        this.voteRepository = voteRepository;
         this.modelMapper = modelMapper;
+        this.candidateClientService = candidateClientService;
     }
 
 
@@ -69,7 +77,8 @@ public class ElectionService {
         if (election == null){
             throw new GenericOutputException(MESSAGE_ELECTION_NOT_FOUND);
         }
-
+        validateElectionVotes(electionId);
+        candidateCountByElectionId(electionId);
         election.setStateCode(electionInput.getStateCode());
         election.setDescription(electionInput.getDescription());
         election.setYear(electionInput.getYear());
@@ -90,6 +99,30 @@ public class ElectionService {
         electionRepository.delete(election);
 
         return new GenericOutput("Election deleted");
+    }
+
+    private void validateElectionVotes(Long electionId){
+
+        if(voteRepository.countByElectionId(electionId) > 0){
+
+            throw new GenericOutputException("Election already has votes");
+        }
+    }
+
+    private void candidateCountByElectionId(Long electionId){
+
+        try{
+            if(candidateClientService.getCountElectionById(electionId) > 0){
+                throw new GenericOutputException("Election already have candidates");
+            }
+        }catch(FeignException e){
+            if(e.status() == 0){
+                throw new GenericOutputException("Candidate not found");
+            }
+            if(e.status() == 500){
+                throw new GenericOutputException("Invalid Candidate");
+            }
+        }
     }
 
     private void validateDuplicate(ElectionInput electionInput, Long id){
