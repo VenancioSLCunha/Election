@@ -16,35 +16,31 @@ public class CandidateClientService {
 
     @Autowired
     public CandidateClientService(CandidateClient candidateClient){
-
         this.candidateClient = candidateClient;
-
     }
 
-    public Long getCountElectionById(Long electionId){
-        return this.candidateClient.getCountElectionById(electionId);
+    public CandidateOutput getById(Long candidateId){
+        return candidateClient.getById(candidateId);
     }
 
-    public List<CandidateOutput> getAll(){
-        return this.candidateClient.getAll();
+    public List<CandidateOutput> getByElection(Long electionId){
+        return candidateClient.getByElection(electionId);
     }
 
-    public Long getCandidateByCandidateNumber(Long candidateNumber){
-        return this.candidateClient.getCandidateByCandidateNumber(candidateNumber);
+    public CandidateOutput getByNumberAndElection(Long electionId, Long candidateNumber){
+        return candidateClient.getByNumberAndElection(electionId, candidateNumber);
     }
 
+    @FeignClient(name = "candidate-service", url = "${url.candidate-service}")
+    private interface CandidateClient {
 
-    @FeignClient(value="candidate-service", url="http://localhost:8082")
-    public interface CandidateClient{
-
-        @GetMapping("/v1/candidate/")
-        List<CandidateOutput> getAll();
+        @GetMapping("/v1/candidate/{candidateId}")
+        CandidateOutput getById(@PathVariable(name = "candidateId") Long candidateId);
 
         @GetMapping("/v1/candidate/election/{electionId}")
-        Long getCountElectionById(@PathVariable(name = "electionId") Long electionId);
+        List<CandidateOutput> getByElection(@PathVariable(name = "electionId") Long electionId);
 
-        @GetMapping("/v1/candidate/candidatenumber/{candidateNumber}")
-        Long getCandidateByCandidateNumber(@PathVariable(name = "candidateNumber") Long candidateNumber);
-
+        @GetMapping("/getByNumberAndElection/{electionId}/{candidateNumber}")
+        CandidateOutput getByNumberAndElection(@PathVariable(name = "electionId") Long electionId, @PathVariable(name = "candidateNumber") Long candidateNumber);
     }
 }

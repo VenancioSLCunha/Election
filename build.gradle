@@ -39,7 +39,6 @@ dependencies {
 	implementation('org.modelmapper:modelmapper:0.7.5')
 	runtimeOnly('com.h2database:h2')
 	testImplementation('org.springframework.boot:spring-boot-starter-test')
-	implementation('org.springframework.cloud:spring-cloud-starter-openfeign')
 }
 
 dependencyManagement {

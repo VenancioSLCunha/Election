@@ -6,9 +6,7 @@ import br.edu.ulbra.election.election.exception.GenericOutputException;
 import br.edu.ulbra.election.election.input.v1.VoteInput;
 import br.edu.ulbra.election.election.model.Election;
 import br.edu.ulbra.election.election.model.Vote;
-import br.edu.ulbra.election.election.output.v1.CandidateOutput;
 import br.edu.ulbra.election.election.output.v1.GenericOutput;
-import br.edu.ulbra.election.election.output.v1.VoterOutput;
 import br.edu.ulbra.election.election.repository.ElectionRepository;
 import br.edu.ulbra.election.election.repository.VoteRepository;
 import feign.FeignException;
@@ -24,8 +22,9 @@ public class VoteService {
 
     private final ElectionRepository electionRepository;
 
-    private final CandidateClientService candidateClientService;
     private final VoterClientService voterClientService;
+
+    private final CandidateClientService candidateClientService;
 
     @Autowired
     public VoteService(VoteRepository voteRepository, ElectionRepository electionRepository, VoterClientService voterClientService, CandidateClientService candidateClientService){
@@ -42,14 +41,19 @@ public class VoteService {
         vote.setElection(election);
         vote.setVoterId(voteInput.getVoterId());
 
+        vote.setNullVote(false);
         if (voteInput.getCandidateNumber() == null){
             vote.setBlankVote(true);
         } else {
             vote.setBlankVote(false);
+            try {
+                candidateClientService.getByNumberAndElection(voteInput.getElectionId(), voteInput.getCandidateNumber());
+            } catch (FeignException ex){
+                if (ex.status() == 500){
+                    vote.setNullVote(true);
+                }
+            }
         }
-
-        // TODO: Validate null candidate
-        vote.setNullVote(this.checkNumberCandidates(voteInput.getCandidateNumber()));
 
         voteRepository.save(vote);
 
@@ -71,38 +75,22 @@ public class VoteService {
         if (voteInput.getVoterId() == null){
             throw new GenericOutputException("Invalid Voter");
         }
-
         try {
-            VoterOutput voterOutput = voterClientService.getById(voteInput.getVoterId());
-            if (voterOutput == null) {
-                throw new GenericOutputException("Invalid Voter");
-            }
-        } catch (FeignException e) {
-            if (e.status() == 500) {
+            voterClientService.getById(voteInput.getVoterId());
+        } catch (FeignException ex){
+            if (ex.status() == 500){
                 throw new GenericOutputException("Invalid Voter");
             }
         }
 
+        Vote vote = voteRepository.findFirstByVoterIdAndElection(voteInput.getVoterId(), election);
+        if (vote != null){
+            throw new GenericOutputException("Voter already vote on that election");
+        }
         return election;
     }
 
-    private boolean checkNumberCandidates(Long number) {
-        try {
-
-            List<CandidateOutput> candidateList = candidateClientService.getAll();
-
-            CandidateOutput candidate;
-
-            for (int i = 0; i < candidateList.size(); i++) {
-
-                candidate = candidateList.get(i);
-                if (candidate.getNumberElection() == number) return false;
-            }
-
-        } catch (FeignException ex) {
-
-            throw new GenericOutputException("Invalid candidate");
-        }
-        return true;
+    public GenericOutput findVotesByVoter(Long voterId) {
+        return new GenericOutput(""+voteRepository.countByVoterId(voterId));
     }
 }
