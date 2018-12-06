@@ -9,9 +9,11 @@ import br.edu.ulbra.election.election.model.Vote;
 import br.edu.ulbra.election.election.output.v1.GenericOutput;
 import br.edu.ulbra.election.election.repository.ElectionRepository;
 import br.edu.ulbra.election.election.repository.VoteRepository;
+import br.edu.ulbra.election.election.output.v1.VoterOutput;
 import feign.FeignException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
 
 import java.util.List;
 
@@ -34,9 +36,12 @@ public class VoteService {
         this.candidateClientService = candidateClientService;
     }
 
-    public GenericOutput electionVote(VoteInput voteInput){
+    public GenericOutput electionVote(VoteInput voteInput, String token){
 
         Election election = validateInput(voteInput.getElectionId(), voteInput);
+
+        validateToken(token, voteInput.getVoterId());
+
         Vote vote = new Vote();
         vote.setElection(election);
         vote.setVoterId(voteInput.getVoterId());
@@ -60,11 +65,28 @@ public class VoteService {
         return new GenericOutput("OK");
     }
 
-    public GenericOutput multiple(List<VoteInput> voteInputList){
+    public GenericOutput multiple(List<VoteInput> voteInputList, String token){
         for (VoteInput voteInput : voteInputList){
-            this.electionVote(voteInput);
+            this.electionVote(voteInput, token);
         }
         return new GenericOutput("OK");
+    }
+
+    private void validateToken(String token, Long voterId){
+        try {
+            VoterOutput voterOutput = voterClientService.checkToken(token);
+            if(voterOutput == null){
+                throw new GenericOutputException("Invalid token");
+            }
+
+            if(!voterOutput.getId().equals(voterId)){
+                throw new GenericOutputException("Invalid token");
+            }
+        } catch (FeignException e) {
+            if (e.status() == 500) {
+                throw new GenericOutputException("Invalid token");
+            }
+        }
     }
 
     public Election validateInput(Long electionId, VoteInput voteInput){

@@ -13,6 +13,7 @@ public class VoterOutput {
     @ApiModelProperty(example = "John Doe", notes = "Voter name")
     private String name;
 
+
     public Long getId() {
         return id;
     }
